@@ -1,21 +1,31 @@
 {
-  "name": "kt03-blog-api",
+  "name": "kt04-blog-api",
   "version": "1.0.0",
   "description": "Простой REST API блога на Express, Prisma и SQLite",
-  "main": "src/index.js",
+  "main": "src/server.js",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "jest --runInBand",
+    "make:admin": "node scripts/makeAdmin.js",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "prisma:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "joi": "^17.13.3"
+    "express-rate-limit": "^8.7.5",
+    "helmet": "^8.3.0",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
-    "prisma": "^6.19.0"
+    "jest": "^29.7.0",
+    "prisma": "^6.19.0",
+    "supertest": "^7.3.2"
   }
 }

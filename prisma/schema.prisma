@@ -11,9 +11,19 @@ model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String
+  password  String
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   posts     Post[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  expiresAt DateTime
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Post {
@@ -35,5 +45,6 @@ model Tag {
 
 enum Role {
   USER
+  MODERATOR
   ADMIN
 }

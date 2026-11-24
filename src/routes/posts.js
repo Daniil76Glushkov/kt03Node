@@ -1,14 +1,18 @@
 const express = require('express');
 const Joi = require('joi');
 const validate = require('../middleware/validate');
+const { authenticate, canEditPost } = require('../middleware/auth');
+const userSelect = require('../utils/user');
 
 const router = express.Router();
+
+router.use(authenticate);
 
 const postSchema = Joi.object({
   title: Joi.string().min(1).required(),
   content: Joi.string().allow('', null),
   published: Joi.boolean().default(false),
-  authorId: Joi.number().integer().positive().max(2147483647).required(),
+  authorId: Joi.forbidden(),
   tags: Joi.array().items(Joi.string().trim().min(1)).unique().default([]),
 });
 
@@ -16,7 +20,7 @@ const updatePostSchema = Joi.object({
   title: Joi.string().min(1),
   content: Joi.string().allow('', null),
   published: Joi.boolean(),
-  authorId: Joi.number().integer().positive().max(2147483647),
+  authorId: Joi.forbidden(),
   tags: Joi.array().items(Joi.string().trim().min(1)).unique(),
 }).min(1);
 
@@ -51,7 +55,7 @@ function filters(query) {
 }
 
 const postInclude = {
-  author: true,
+  author: { select: userSelect },
   tags: true,
 };
 
@@ -120,6 +124,7 @@ router.post('/', validate(postSchema), async (req, res, next) => {
     const post = await req.prisma.post.create({
       data: {
         ...postData,
+        authorId: req.user.id,
         tags: {
           connectOrCreate: tags.map((name) => ({
             where: { name },
@@ -136,7 +141,7 @@ router.post('/', validate(postSchema), async (req, res, next) => {
   }
 });
 
-router.patch('/:id', validate(updatePostSchema), async (req, res, next) => {
+router.patch('/:id', canEditPost, validate(updatePostSchema), async (req, res, next) => {
   try {
     const { tags, ...postData } = req.body;
     const data = { ...postData };
@@ -163,7 +168,7 @@ router.patch('/:id', validate(updatePostSchema), async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', canEditPost, async (req, res, next) => {
   try {
     await req.prisma.post.delete({ where: { id: Number(req.params.id) } });
     res.status(204).send();

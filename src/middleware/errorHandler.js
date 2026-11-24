@@ -20,7 +20,13 @@ function errorHandler(error, req, res, next) {
   }
 
   console.error(error);
-  res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  const response = { error: 'Внутренняя ошибка сервера' };
+
+  if (process.env.NODE_ENV === 'development') {
+    response.stack = error.stack;
+  }
+
+  res.status(500).json(response);
 }
 
 module.exports = errorHandler;

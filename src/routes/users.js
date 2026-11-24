@@ -1,19 +1,19 @@
 const express = require('express');
 const Joi = require('joi');
 const validate = require('../middleware/validate');
+const bcrypt = require('bcrypt');
+const { authenticate, allowRoles } = require('../middleware/auth');
+const { registerSchema } = require('../validation/auth');
+const userSelect = require('../utils/user');
 
 const router = express.Router();
 
-const userSchema = Joi.object({
-  email: Joi.string().email().required(),
-  name: Joi.string().min(1).required(),
-  role: Joi.string().valid('USER', 'ADMIN').default('USER'),
-});
+router.use(authenticate);
 
 const updateUserSchema = Joi.object({
-  email: Joi.string().email(),
-  name: Joi.string().min(1),
-  role: Joi.string().valid('USER', 'ADMIN'),
+  email: Joi.string().trim().lowercase().email(),
+  name: Joi.string().trim().min(1).max(100),
+  role: Joi.forbidden(),
 }).min(1);
 
 const querySchema = Joi.object({
@@ -25,12 +25,13 @@ router.use('/:id', validate(Joi.object({
   id: Joi.number().integer().positive().max(2147483647).required(),
 }), 'params'));
 
-router.get('/', validate(querySchema, 'query'), async (req, res, next) => {
+router.get('/', allowRoles('MODERATOR', 'ADMIN'), validate(querySchema, 'query'), async (req, res, next) => {
   try {
     const { page, limit } = req.query;
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       req.prisma.user.findMany({
+        select: userSelect,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -47,11 +48,12 @@ router.get('/', validate(querySchema, 'query'), async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', allowRoles('MODERATOR', 'ADMIN'), async (req, res, next) => {
   try {
     const user = await req.prisma.user.findUnique({
       where: { id: Number(req.params.id) },
-      include: {
+      select: {
+        ...userSelect,
         posts: {
           orderBy: { createdAt: 'desc' },
           include: { tags: true },
@@ -69,20 +71,24 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-router.post('/', validate(userSchema), async (req, res, next) => {
+router.post('/', allowRoles('ADMIN'), validate(registerSchema), async (req, res, next) => {
   try {
-    const user = await req.prisma.user.create({ data: req.body });
+    const user = await req.prisma.user.create({
+      data: { ...req.body, password: await bcrypt.hash(req.body.password, 10), role: 'USER' },
+      select: userSelect,
+    });
     res.status(201).json(user);
   } catch (error) {
     next(error);
   }
 });
 
-router.patch('/:id', validate(updateUserSchema), async (req, res, next) => {
+router.patch('/:id', allowRoles('ADMIN'), validate(updateUserSchema), async (req, res, next) => {
   try {
     const user = await req.prisma.user.update({
       where: { id: Number(req.params.id) },
       data: req.body,
+      select: userSelect,
     });
     res.json(user);
   } catch (error) {
@@ -90,7 +96,7 @@ router.patch('/:id', validate(updateUserSchema), async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', allowRoles('ADMIN'), async (req, res, next) => {
   try {
     await req.prisma.user.delete({ where: { id: Number(req.params.id) } });
     res.status(204).send();
